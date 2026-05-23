@@ -210,20 +210,13 @@
 
 <div class="content">
 
-    <!-- Deadline setter -->
-    <div class="deadline-box">
-    <label>Submission Deadline:</label>
-    <input type="date" id="deadline-input"
-           value="{% if deadline %}{{ deadline.deadline|date:'Y-m-d' }}{% endif %}">
-    <button onclick="setDeadline()">Set Deadline</button>
-    {% if deadline %}
-    <span style="color:#888; font-size:13px;">Current deadline: <strong>{{ deadline.deadline }}</strong></span>
-    {% endif %}
+    <div style="margin-bottom:24px; text-align:right;">
     <a href="/dean/export/?year={{ year }}&month={{ month }}"
-       style="margin-left:auto; background:#28a745; color:white; padding:8px 20px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:14px;">
+       style="background:#28a745; color:white; padding:10px 24px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:14px;">
         ⬇ Download Excel
     </a>
 </div>
+
 
     {% if not teacher_rows %}
         <div class="no-teachers">

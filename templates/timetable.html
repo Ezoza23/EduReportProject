@@ -280,19 +280,8 @@
 <div class="submit-bar">
     {% if already_submitted %}
         <div class="submitted-badge">✓ Report Submitted</div>
-    {% elif can_submit %}
-        <button onclick="submitReport()">📤 Send Report</button>
-        {% if deadline %}
-        <div class="deadline-info">Deadline: {{ deadline.deadline }}</div>
-        {% endif %}
     {% else %}
-        <div class="deadline-info">
-            {% if deadline %}
-                Deadline: {{ deadline.deadline }} — Submission closed
-            {% else %}
-                No deadline set by dean yet
-            {% endif %}
-        </div>
+        <button onclick="submitReport()">📤 Send Report</button>
     {% endif %}
 </div>
 

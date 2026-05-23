@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.utils import timezone
-from .models import Teacher, TimetableCard, LessonRecord, MonthlyReport, ReportDeadline
+from .models import Teacher, TimetableCard, LessonRecord, MonthlyReport
 
 PERIOD_TIMES = {
     "1": ("09:00", "10:10"),
@@ -93,9 +93,7 @@ def timetable_view(request):
     )
     record_map = {(r.card_id, str(r.date)): r for r in records}
 
-    # Check deadline
-    deadline_obj = ReportDeadline.objects.filter(year=year, month=month).first()
-    can_submit = deadline_obj is not None and date.today() <= deadline_obj.deadline
+    can_submit = True  # always can submit
 
     # Check if already submitted
     report = MonthlyReport.objects.filter(teacher=teacher, year=year, month=month).first()
@@ -151,7 +149,7 @@ def timetable_view(request):
         "next": {"year": next_month.year, "month": next_month.month},
         "can_submit": can_submit,
         "already_submitted": already_submitted,
-        "deadline": deadline_obj,
+
     })
 
 
@@ -219,8 +217,6 @@ def dean_dashboard(request):
     all_days = [date(year, month, d) for d in range(1, num_days + 1)]
     working_days = [d for d in all_days if d.weekday() < 6]
 
-    # Get deadline
-    deadline_obj = ReportDeadline.objects.filter(year=year, month=month).first()
 
     # Get teachers in same department
     dept_teachers = Teacher.objects.filter(
@@ -265,33 +261,13 @@ def dean_dashboard(request):
         "month_name": date(year, month, 1).strftime("%B %Y"),
         "year": year,
         "month": month,
-        "deadline": deadline_obj,
+
         "prev": {"year": prev_month.year, "month": prev_month.month},
         "next": {"year": next_month_date.year, "month": next_month_date.month},
     })
 
 
-@login_required(login_url="login")
-@require_POST
-def set_deadline(request):
-    teacher = Teacher.objects.filter(user=request.user).first()
-    if not teacher or not teacher.is_dean:
-        return JsonResponse({"status": "forbidden"}, status=403)
 
-    year = int(request.POST.get("year"))
-    month = int(request.POST.get("month"))
-    deadline_str = request.POST.get("deadline")
-
-    ReportDeadline.objects.update_or_create(
-        year=year,
-        month=month,
-        defaults={
-            "deadline": date.fromisoformat(deadline_str),
-            "set_by": teacher,
-        }
-    )
-
-    return JsonResponse({"status": "ok"})
 import io
 from django.http import HttpResponse
 from openpyxl import Workbook

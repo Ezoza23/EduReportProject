@@ -15,11 +15,12 @@ def start():
 
     scheduler.add_job(
         sync_job,
-        trigger="interval",
-        hours=24,
+        trigger="cron",
+        hour=3,
+        minute=0,
         id="sync_edupage",
         replace_existing=True,
     )
 
     scheduler.start()
-    print("Scheduler started — syncing every 24 hours")
+    print("Scheduler started — syncing daily at 3:00 AM")

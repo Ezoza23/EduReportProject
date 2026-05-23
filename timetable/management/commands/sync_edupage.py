@@ -1,6 +1,7 @@
 import requests
+from datetime import date
 from django.core.management.base import BaseCommand
-from timetable.models import Teacher, Subject, Classroom, Group, TimetableCard
+from timetable.models import Teacher, Subject, Classroom, Group, TimetableCard, LessonRecord
 
 HEADERS = {
     "Content-Type": "application/json",
@@ -38,8 +39,9 @@ class Command(BaseCommand):
     help = "Sync timetable data from EduPage"
 
     def handle(self, *args, **kwargs):
-        self.stdout.write("Fetching from EduPage...")
+        today = date.today()
 
+        self.stdout.write("Fetching from EduPage...")
         data = fetch_data()
         tables = data["r"]["dbiAccessorRes"]["tables"]
 
@@ -88,15 +90,26 @@ class Command(BaseCommand):
 
         # --- Sync Cards ---
         self.stdout.write("Syncing timetable cards...")
-        TimetableCard.objects.all().delete()
 
         lessons_map = {l["id"]: l for l in db["lessons"]}
         classes_map = {c["id"]: c for c in db["classes"]}
 
+        # Get card IDs that have past lesson records — NEVER delete these
+        protected_card_ids = set(
+            LessonRecord.objects.filter(date__lt=today).values_list("card_id", flat=True)
+        )
+        self.stdout.write(f"  Protected cards (have past records): {len(protected_card_ids)}")
+
+        # Delete only cards that are NOT protected
+        TimetableCard.objects.exclude(id__in=protected_card_ids).delete()
+
         count = 0
         for card in db["cards"]:
-            lesson = lessons_map.get(card.get("lessonid"), {})
+            # Skip unscheduled cards
+            if not card.get("period") or not card.get("days") or "1" not in card.get("days", ""):
+                continue
 
+            lesson = lessons_map.get(card.get("lessonid"), {})
             teacher_ids = lesson.get("teacherids", [])
             if not teacher_ids:
                 continue
@@ -117,29 +130,42 @@ class Command(BaseCommand):
             days = decode_days(card.get("days", ""))
             period = card.get("period", "")
 
-            # Use classids first, fall back to groupids
             class_ids = lesson.get("classids", [])
-            group_ids = lesson.get("groupids", [])
-
-            # Get class names directly
             class_names = ", ".join([
                 classes_map.get(cid, {}).get("name", cid)
                 for cid in class_ids
             ])
 
+            group_ids = lesson.get("groupids", [])
             groups = Group.objects.filter(edupage_id__in=group_ids)
 
             for day in days:
-                tc = TimetableCard.objects.create(
+                # If protected card exists for this teacher+day+period, update it
+                protected = TimetableCard.objects.filter(
+                    id__in=protected_card_ids,
                     teacher=teacher,
-                    subject=subject,
-                    classroom=classroom,
-                    day=day,
                     period=period,
-                    class_names=class_names,  # 👈 we need to add this field
-                )
-                tc.groups.set(groups)
-                count += 1
+                    day=day,
+                ).first()
+
+                if protected:
+                    protected.subject = subject
+                    protected.classroom = classroom
+                    protected.class_names = class_names
+                    protected.save()
+                    protected.groups.set(groups)
+                    count += 1
+                else:
+                    tc = TimetableCard.objects.create(
+                        teacher=teacher,
+                        subject=subject,
+                        classroom=classroom,
+                        day=day,
+                        period=period,
+                        class_names=class_names,
+                    )
+                    tc.groups.set(groups)
+                    count += 1
 
         self.stdout.write(f"  ✅ {count} timetable cards")
         self.stdout.write(self.style.SUCCESS("All done!"))
