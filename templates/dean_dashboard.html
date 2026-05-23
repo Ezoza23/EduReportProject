@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+{% load timetable_tags %}
+<html>
+<head>
+    <title>Dean Dashboard</title>
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; background: #f0f2f5; }
+
+        .header {
+            background: #1b497d;
+            color: white;
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h2 { font-size: 18px; }
+        .header-links { display: flex; gap: 12px; }
+        .header a {
+            color: white;
+            text-decoration: none;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .header a:hover { background: rgba(255,255,255,0.3); }
+
+        .month-nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            padding: 20px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #1b497d;
+        }
+        .month-nav a {
+            color: #1b497d;
+            text-decoration: none;
+            font-size: 24px;
+            padding: 4px 12px;
+            border-radius: 4px;
+            background: white;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }
+        .month-nav a:hover { background: #e8f0fb; }
+
+        .content { padding: 24px; }
+
+        .deadline-box {
+            background: white;
+            border-radius: 8px;
+            padding: 16px 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .deadline-box label { font-weight: bold; color: #1b497d; }
+        .deadline-box input {
+            padding: 8px 12px;
+            border: 1.5px solid #dde3ed;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .deadline-box button {
+            background: #1b497d;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .deadline-box button:hover { background: #163d6a; }
+
+        .dept-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #1b497d;
+            margin-bottom: 12px;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+        }
+
+        table {
+            border-collapse: collapse;
+            min-width: 100%;
+            white-space: nowrap;
+        }
+
+        th {
+            background: #1b497d;
+            color: white;
+            padding: 10px 8px;
+            text-align: center;
+            font-size: 12px;
+            min-width: 36px;
+        }
+        th.teacher-col {
+            text-align: left;
+            min-width: 180px;
+            padding-left: 16px;
+        }
+        th.total-col {
+            background: #163d6a;
+            min-width: 60px;
+        }
+        th.status-col {
+            background: #163d6a;
+            min-width: 100px;
+        }
+
+        td {
+            border: 1px solid #eaeff7;
+            padding: 10px 8px;
+            text-align: center;
+            font-size: 13px;
+        }
+        td.teacher-name {
+            text-align: left;
+            padding-left: 16px;
+            font-weight: 600;
+            color: #1b3a6b;
+            background: #f7f9fc;
+            border-right: 2px solid #e0e7f0;
+        }
+        td.count-cell {
+            color: #333;
+            font-weight: 500;
+        }
+        td.count-cell.has-lessons {
+            background: #e8f5ec;
+            color: #155724;
+            font-weight: bold;
+        }
+        td.count-cell.zero {
+            color: #ccc;
+        }
+        td.total-cell {
+            background: #eef4ff;
+            font-weight: bold;
+            color: #1b497d;
+            font-size: 14px;
+            border-left: 2px solid #c5d8f0;
+        }
+        td.status-cell { border-left: 2px solid #c5d8f0; }
+
+        .badge-submitted {
+            background: #28a745;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .badge-pending {
+            background: #ffc107;
+            color: #333;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+        }
+        .badge-none {
+            background: #e9ecef;
+            color: #888;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+        }
+
+        .day-header-date { font-size: 13px; font-weight: bold; }
+        .day-header-name { font-size: 10px; color: rgba(255,255,255,0.7); }
+
+        .no-teachers {
+            text-align: center;
+            padding: 60px;
+            color: #aaa;
+            font-size: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>Dean Dashboard — {{ teacher.department.name|default:"All Departments" }}</h2>
+    <div class="header-links">
+        <a href="{% url 'timetable' %}">My Timetable</a>
+        <a href="{% url 'logout' %}">Logout</a>
+    </div>
+</div>
+
+<div class="month-nav">
+    <a href="?year={{ prev.year }}&month={{ prev.month }}">&#8249;</a>
+    {{ month_name }}
+    <a href="?year={{ next.year }}&month={{ next.month }}">&#8250;</a>
+</div>
+
+<div class="content">
+
+    <!-- Deadline setter -->
+    <div class="deadline-box">
+    <label>Submission Deadline:</label>
+    <input type="date" id="deadline-input"
+           value="{% if deadline %}{{ deadline.deadline|date:'Y-m-d' }}{% endif %}">
+    <button onclick="setDeadline()">Set Deadline</button>
+    {% if deadline %}
+    <span style="color:#888; font-size:13px;">Current deadline: <strong>{{ deadline.deadline }}</strong></span>
+    {% endif %}
+    <a href="/dean/export/?year={{ year }}&month={{ month }}"
+       style="margin-left:auto; background:#28a745; color:white; padding:8px 20px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:14px;">
+        ⬇ Download Excel
+    </a>
+</div>
+
+    {% if not teacher_rows %}
+        <div class="no-teachers">
+            No teachers found in your department.<br>
+            Make sure teachers are assigned to your department in admin.
+        </div>
+    {% else %}
+        <div class="dept-title">
+            {{ teacher.department.name|default:"Department" }} — {{ month_name }}
+        </div>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="teacher-col">Teacher</th>
+                        {% for d in working_days %}
+                        <th>
+                            <div class="day-header-date">{{ d|date:"d" }}</div>
+                            <div class="day-header-name">{{ d|date:"D" }}</div>
+                        </th>
+                        {% endfor %}
+                        <th class="total-col">Total</th>
+                        <th class="status-col">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in teacher_rows %}
+                    <tr>
+                        <td class="teacher-name">{{ row.teacher.full_name }}</td>
+                        {% for d in working_days %}
+                        {% with count=row.day_counts|get_item:d %}
+                        <td class="count-cell {% if count %}has-lessons{% else %}zero{% endif %}">
+                            {% if count %}{{ count }}{% else %}—{% endif %}
+                        </td>
+                        {% endwith %}
+                        {% endfor %}
+                        <td class="total-cell">{{ row.total }}</td>
+                        <td class="status-cell">
+                            {% if row.status == "submitted" %}
+                                <span class="badge-submitted">Submitted</span>
+                            {% elif row.status == "draft" %}
+                                <span class="badge-pending">Draft</span>
+                            {% else %}
+                                <span class="badge-none">Not started</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+function getCSRF() {
+    const name = 'csrftoken';
+    const cookies = document.cookie.split(';');
+    for (let c of cookies) {
+        c = c.trim();
+        if (c.startsWith(name + '=')) return decodeURIComponent(c.slice(name.length + 1));
+    }
+    return document.querySelector('meta[name="csrf-token"]')?.content || '';
+}
+
+const YEAR = {{ year }};
+const MONTH = {{ month }};
+
+function setDeadline() {
+    const deadline = document.getElementById("deadline-input").value;
+    if (!deadline) return alert("Please pick a date");
+    fetch("/set-deadline/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-CSRFToken": getCSRF(),
+        },
+        body: `year=${YEAR}&month=${MONTH}&deadline=${deadline}`
+    })
+    .then(r => r.json())
+    .then(data => { if (data.status === "ok") location.reload(); });
+}
+</script>
+
+</body>
+</html>

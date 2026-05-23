@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Timetable - {{ teacher.full_name }}</title>
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; background: #f0f2f5; }
+
+        .header {
+            background: #1b497d;
+            color: white;
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h2 { font-size: 18px; }
+        .header-links { display: flex; gap: 12px; }
+        .header a {
+            color: white;
+            text-decoration: none;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .header a:hover { background: rgba(255,255,255,0.3); }
+
+        .month-nav {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            padding: 20px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #1b497d;
+        }
+        .month-nav a {
+            color: #1b497d;
+            text-decoration: none;
+            font-size: 24px;
+            padding: 4px 12px;
+            border-radius: 4px;
+            background: white;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }
+        .month-nav a:hover { background: #e8f0fb; }
+
+        .submit-bar {
+            text-align: center;
+            padding: 14px;
+            background: white;
+            border-bottom: 1px solid #dde3ed;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        }
+        .submit-bar button {
+            background: #1b497d;
+            color: white;
+            border: none;
+            padding: 10px 36px;
+            border-radius: 6px;
+            font-size: 15px;
+            cursor: pointer;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+        .submit-bar button:hover { background: #163d6a; }
+        .submitted-badge {
+            background: #28a745;
+            color: white;
+            padding: 10px 32px;
+            border-radius: 6px;
+            font-size: 15px;
+            display: inline-block;
+            font-weight: bold;
+        }
+        .deadline-info { font-size: 13px; color: #999; margin-top: 6px; }
+
+        .content { padding: 20px 28px; }
+        .week-block { margin-bottom: 36px; }
+        .week-title {
+            font-size: 12px;
+            font-weight: bold;
+            color: #bbb;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            table-layout: fixed;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+        }
+
+        th {
+            background: #1b497d;
+            color: white;
+            padding: 10px 6px;
+            text-align: center;
+            font-size: 13px;
+        }
+        .period-number { font-size: 15px; font-weight: bold; color: white; }
+        .period-time { font-size: 10px; color: rgba(255,255,255,0.75); line-height: 1.7; }
+
+        td {
+            border: 1px solid #eaeff7;
+            vertical-align: top;
+            padding: 0;
+            height: 100px;
+        }
+
+        td.day-cell {
+            background: #f7f9fc;
+            text-align: center;
+            vertical-align: middle;
+            width: 80px;
+            padding: 6px;
+            border-right: 2px solid #e0e7f0;
+        }
+        .day-name { font-weight: bold; font-size: 13px; color: #1b497d; }
+        .day-date { font-size: 11px; color: #bbb; margin-top: 3px; }
+
+        .cell-card {
+            width: 100%;
+            height: 100%;
+            padding: 7px 8px;
+            background: linear-gradient(135deg, #eef4ff, #e8f0fb);
+            border-left: 4px solid #4a7fc1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            transition: background 0.2s;
+        }
+        .cell-card.covered {
+            border-left-color: #28a745;
+            background: linear-gradient(135deg, #f0fff4, #e6f9ed);
+        }
+        .cell-card.replaced {
+            border-left-color: #f39c12;
+            background: linear-gradient(135deg, #fffbf0, #fef3d0);
+        }
+
+        .card-subject { font-weight: 700; font-size: 11px; color: #1b3a6b; line-height: 1.3; }
+        .card-class { font-size: 10px; color: #555; margin-top: 1px; }
+        .card-room { font-size: 10px; color: #aaa; }
+
+        .card-status {
+            margin-top: auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 4px;
+        }
+
+        .status-badge {
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 7px;
+            border-radius: 10px;
+        }
+        .status-badge.covered { background: #d4edda; color: #155724; }
+        .status-badge.replaced { background: #ffeaa7; color: #856404; }
+        .status-badge.pending { background: #e9ecef; color: #888; }
+
+        .card-btns { display: flex; gap: 4px; }
+
+        .btn-covered {
+            border: 1.5px solid #28a745;
+            background: none;
+            color: #28a745;
+            border-radius: 5px;
+            padding: 3px 8px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn-covered:hover { background: #28a745; color: white; }
+        .cell-card.covered .btn-covered { background: #28a745; color: white; }
+
+        .btn-edit {
+            border: 1.5px solid #4a7fc1;
+            background: none;
+            color: #4a7fc1;
+            border-radius: 5px;
+            padding: 3px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn-edit:hover { background: #4a7fc1; color: white; }
+
+        .cell-empty { width: 100%; height: 100%; background: #fafbfc; }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.45);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            width: 400px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+        }
+        .modal h3 { color: #1b497d; margin-bottom: 4px; font-size: 18px; }
+        .modal .modal-subject { font-size: 13px; color: #999; margin-bottom: 16px; }
+        .modal label {
+            font-size: 13px;
+            color: #555;
+            font-weight: bold;
+            display: block;
+            margin-top: 14px;
+            margin-bottom: 5px;
+        }
+        .modal input,
+        .modal select,
+        .modal textarea {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1.5px solid #dde3ed;
+            border-radius: 7px;
+            font-size: 14px;
+            outline: none;
+            transition: border 0.15s;
+        }
+        .modal input:focus,
+        .modal select:focus,
+        .modal textarea:focus { border-color: #4a7fc1; }
+        .modal textarea { height: 75px; resize: none; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 22px; }
+        .modal-actions button {
+            flex: 1;
+            padding: 11px;
+            border: none;
+            border-radius: 7px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.15s;
+        }
+        .btn-save { background: #1b497d; color: white; }
+        .btn-save:hover { background: #163d6a; }
+        .btn-cancel { background: #f0f2f5; color: #666; }
+        .btn-cancel:hover { background: #e2e5ea; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>{{ teacher.full_name }} — Timetable</h2>
+    <div class="header-links">
+        {% if teacher.is_dean %}
+        <a href="{% url 'dean_dashboard' %}">Dean Dashboard</a>
+        {% endif %}
+        <a href="{% url 'logout' %}">Logout</a>
+    </div>
+</div>
+
+<div class="month-nav">
+    <a href="?year={{ prev.year }}&month={{ prev.month }}">&#8249;</a>
+    {{ month_name }}
+    <a href="?year={{ next.year }}&month={{ next.month }}">&#8250;</a>
+</div>
+
+<div class="submit-bar">
+    {% if already_submitted %}
+        <div class="submitted-badge">✓ Report Submitted</div>
+    {% elif can_submit %}
+        <button onclick="submitReport()">📤 Send Report</button>
+        {% if deadline %}
+        <div class="deadline-info">Deadline: {{ deadline.deadline }}</div>
+        {% endif %}
+    {% else %}
+        <div class="deadline-info">
+            {% if deadline %}
+                Deadline: {{ deadline.deadline }} — Submission closed
+            {% else %}
+                No deadline set by dean yet
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+
+<div class="content">
+    {% if error %}
+        <p style="color:red; padding:20px;">{{ error }}</p>
+    {% else %}
+        {% for week in weeks_data %}
+        <div class="week-block">
+            <div class="week-title">Week {{ forloop.counter }}</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:80px;">Day</th>
+                        {% for p in period_list %}
+                        <th>
+                            <div class="period-number">{{ p.number }}</div>
+                            <div class="period-time">{{ p.start }}</div>
+                            <div class="period-time">{{ p.end }}</div>
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in week %}
+                    <tr>
+                        <td class="day-cell">
+                            <div class="day-name">{{ row.day_name|slice:":3" }}</div>
+                            <div class="day-date">{{ row.date|date:"d M" }}</div>
+                        </td>
+                        {% for cell in row.cells %}
+                        <td>
+                            {% if cell.card %}
+                            <div class="cell-card {% if cell.record.is_replaced %}replaced{% elif cell.record.is_covered %}covered{% endif %}"
+                                 id="cell-{{ cell.card.id }}-{{ cell.date }}">
+                                <div class="card-subject">{{ cell.card.subject }}</div>
+                                <div class="card-class">{{ cell.card.class_names }}</div>
+                                <div class="card-room">{{ cell.card.classroom }}</div>
+                                <div class="card-status">
+                                    {% if cell.record.is_replaced %}
+                                        <span class="status-badge replaced">↔ Rescheduled</span>
+                                    {% elif cell.record.is_covered %}
+                                        <span class="status-badge covered">✓ Covered</span>
+                                    {% else %}
+                                        <span class="status-badge pending">Pending</span>
+                                    {% endif %}
+                                    {% if not already_submitted %}
+                                    <div class="card-btns">
+                                        <button class="btn-covered"
+                                            onclick="markCovered('{{ cell.card.id }}', '{{ cell.date }}')">✓</button>
+                                        <button class="btn-edit"
+                                            onclick="openEdit('{{ cell.card.id }}', '{{ cell.date }}', '{{ cell.card.subject }}')">✎ Edit</button>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="cell-empty"></div>
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+    {% endif %}
+</div>
+
+<!-- Reschedule Modal -->
+<div class="modal-overlay" id="editModal">
+    <div class="modal">
+        <h3>Reschedule Lesson</h3>
+        <div class="modal-subject" id="modal-subject"></div>
+
+        <label>New Date</label>
+        <input type="date" id="replacement-date">
+
+        <label>New Period</label>
+        <select id="replacement-period">
+            {% for p in period_list %}
+            <option value="{{ p.number }}">Period {{ p.number }} — {{ p.start }} – {{ p.end }}</option>
+            {% endfor %}
+        </select>
+
+        <label>Reason</label>
+        <textarea id="replacement-note" placeholder="Reason for rescheduling..."></textarea>
+
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeEdit()">Cancel</button>
+            <button class="btn-save" onclick="saveEdit()">Save</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const YEAR = {{ year }};
+const MONTH = {{ month }};
+
+function getCSRF() {
+    // Try cookie first
+    const name = 'csrftoken';
+    const cookies = document.cookie.split(';');
+    for (let c of cookies) {
+        c = c.trim();
+        if (c.startsWith(name + '=')) {
+            return decodeURIComponent(c.slice(name.length + 1));
+        }
+    }
+    // Fallback to meta tag
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.content : '';
+}
+
+let editCardId = null;
+let editDate = null;
+
+function markCovered(cardId, date) {
+    const cell = document.getElementById(`cell-${cardId}-${date}`);
+    const isCovered = cell.classList.contains("covered");
+
+    fetch("/mark-lesson/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-CSRFToken": getCSRF(),
+        },
+        body: `card_id=${cardId}&date=${date}&is_covered=${isCovered ? 'false' : 'true'}`
+    })
+    .then(r => r.json())
+    .then(data => {
+        const badge = cell.querySelector(".status-badge");
+        const btn = cell.querySelector(".btn-covered");
+        cell.classList.remove("covered", "replaced");
+
+        if (data.is_covered) {
+            cell.classList.add("covered");
+            badge.className = "status-badge covered";
+            badge.textContent = "✓ Covered";
+            btn.style.background = "#28a745";
+            btn.style.color = "white";
+        } else {
+            badge.className = "status-badge pending";
+            badge.textContent = "Pending";
+            btn.style.background = "";
+            btn.style.color = "#28a745";
+        }
+    });
+}
+
+function openEdit(cardId, date, subject) {
+    editCardId = cardId;
+    editDate = date;
+    document.getElementById("modal-subject").textContent = subject;
+    document.getElementById("replacement-date").value = date;
+    document.getElementById("replacement-note").value = "";
+    document.getElementById("editModal").classList.add("active");
+}
+
+function closeEdit() {
+    document.getElementById("editModal").classList.remove("active");
+    editCardId = null;
+    editDate = null;
+}
+
+function saveEdit() {
+    const replacementDate = document.getElementById("replacement-date").value;
+    const note = document.getElementById("replacement-note").value;
+
+    if (!replacementDate) return alert("Please select a new date");
+
+    fetch("/mark-lesson/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-CSRFToken": getCSRF(),
+        },
+        body: `card_id=${editCardId}&date=${editDate}&is_covered=true&replacement_date=${replacementDate}&note=${encodeURIComponent(note)}`
+    })
+    .then(r => r.json())
+    .then(data => {
+        const cell = document.getElementById(`cell-${editCardId}-${editDate}`);
+        cell.classList.remove("covered", "replaced");
+        cell.classList.add("replaced");
+        cell.querySelector(".status-badge").className = "status-badge replaced";
+        cell.querySelector(".status-badge").textContent = "↔ Rescheduled";
+        closeEdit();
+    });
+}
+
+function submitReport() {
+    if (!confirm("Are you sure you want to submit your monthly report?")) return;
+    fetch("/submit-report/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-CSRFToken": getCSRF(),
+        },
+        body: `year=${YEAR}&month=${MONTH}`
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === "submitted") location.reload();
+    });
+}
+
+document.getElementById("editModal").addEventListener("click", function(e) {
+    if (e.target === this) closeEdit();
+});
+</script>
+
+</body>
+</html>
