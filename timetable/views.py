@@ -316,7 +316,7 @@ def export_dean_excel(request):
     dept_teachers = Teacher.objects.filter(
         department=teacher.department,
         user__isnull=False
-    ).exclude(id=teacher.id).order_by("full_name")
+    ).order_by("full_name")
 
     # Build data
     teacher_rows = []
